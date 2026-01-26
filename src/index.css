@@ -3,23 +3,62 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Light mode colors (default) */
+  --text-color: #213547;
+  --bg-color: #ffffff;
+  --link-color: #646cff;
+  --link-hover-color: #747bff;
+  --button-bg: #f9f9f9;
+  --button-bg-hover: #1a1a1a;
+  --button-border: #1a1a1a;
+
+  color-scheme: light;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+}
+
+/* Dark mode - when .dark class is applied OR system prefers dark */
+.dark,
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --text-color: rgba(255, 255, 255, 0.87);
+    --bg-color: #242424;
+    --link-color: #646cff;
+    --link-hover-color: #535bf2;
+    --button-bg: #1a1a1a;
+    --button-bg-hover: #f9f9f9;
+    --button-border: transparent;
+
+    color-scheme: dark;
+  }
+}
+
+.dark {
+  --text-color: rgba(255, 255, 255, 0.87);
+  --bg-color: #242424;
+  --link-color: #646cff;
+  --link-hover-color: #535bf2;
+  --button-bg: #1a1a1a;
+  --button-bg-hover: #f9f9f9;
+  --button-border: transparent;
+
+  color-scheme: dark;
+  color: var(--text-color);
+  background-color: var(--bg-color);
 }
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--link-color);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--link-hover-color);
 }
 
 body {
@@ -37,32 +76,34 @@ h1 {
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--button-border);
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--button-bg);
   cursor: pointer;
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--link-color);
 }
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* Light mode explicit override */
+.light {
+  --text-color: #213547;
+  --bg-color: #ffffff;
+  --link-color: #646cff;
+  --link-hover-color: #747bff;
+  --button-bg: #f9f9f9;
+  --button-bg-hover: #1a1a1a;
+  --button-border: transparent;
+
+  color-scheme: light;
+  color: var(--text-color);
+  background-color: var(--bg-color);
 }
