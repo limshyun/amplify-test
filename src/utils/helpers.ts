@@ -1,90 +1,134 @@
-// 매우 지저분한 코드 - 리팩토링 필요
+// Refactored utility functions with improved type safety and readability
 
-export function processData(d: any) {
-  let r = []
-  for (let i = 0; i < d.length; i++) {
-    if (d[i].active == true) {
-      if (d[i].type == 'user') {
-        if (d[i].age >= 18) {
-          if (d[i].verified == true) {
-            r.push({
-              n: d[i].name,
-              e: d[i].email,
-              a: d[i].age,
-              t: 'adult_verified_user'
-            })
-          } else {
-            r.push({
-              n: d[i].name,
-              e: d[i].email,
-              a: d[i].age,
-              t: 'adult_unverified_user'
-            })
-          }
-        } else {
-          if (d[i].verified == true) {
-            r.push({
-              n: d[i].name,
-              e: d[i].email,
-              a: d[i].age,
-              t: 'minor_verified_user'
-            })
-          } else {
-            r.push({
-              n: d[i].name,
-              e: d[i].email,
-              a: d[i].age,
-              t: 'minor_unverified_user'
-            })
-          }
-        }
-      }
+interface UserInput {
+  active: boolean;
+  type: string;
+  age: number;
+  verified: boolean;
+  name: string;
+  email: string;
+}
+
+interface ProcessedUser {
+  name: string;
+  email: string;
+  age: number;
+  type: 'adult_verified_user' | 'adult_unverified_user' | 'minor_verified_user' | 'minor_unverified_user';
+}
+
+export function processData(data: UserInput[]): ProcessedUser[] {
+  const results: ProcessedUser[] = [];
+
+  for (const item of data) {
+    // Skip inactive or non-user items
+    if (!item.active || item.type !== 'user') {
+      continue;
     }
+
+    // Determine user category
+    const isAdult = item.age >= 18;
+    const userType = isAdult
+      ? (item.verified ? 'adult_verified_user' : 'adult_unverified_user')
+      : (item.verified ? 'minor_verified_user' : 'minor_unverified_user');
+
+    results.push({
+      name: item.name,
+      email: item.email,
+      age: item.age,
+      type: userType
+    });
   }
-  return r
+
+  return results;
 }
 
-export function calc(a: number, b: number, c: string) {
-  if (c == '+') return a + b
-  if (c == '-') return a - b
-  if (c == '*') return a * b
-  if (c == '/') return a / b
-  if (c == '%') return a % b
-  if (c == '**') return a ** b
-  return 0
-}
+type MathOperation = '+' | '-' | '*' | '/' | '%' | '**';
 
-export function fmt(d: Date) {
-  var y = d.getFullYear()
-  var m = d.getMonth() + 1
-  var day = d.getDate()
-  var h = d.getHours()
-  var min = d.getMinutes()
-  var s = d.getSeconds()
-  return y + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day) + ' ' + (h < 10 ? '0' + h : h) + ':' + (min < 10 ? '0' + min : min) + ':' + (s < 10 ? '0' + s : s)
-}
-
-export function validateEmail(e: string) {
-  if (e.indexOf('@') == -1) return false
-  if (e.indexOf('.') == -1) return false
-  if (e.length < 5) return false
-  if (e.indexOf(' ') != -1) return false
-  return true
-}
-
-export function merge(a: any, b: any) {
-  var r: any = {}
-  for (var k in a) r[k] = a[k]
-  for (var k in b) r[k] = b[k]
-  return r
-}
-
-export function debounce(fn: any, delay: any) {
-  var t: any
-  return function(...args: any) {
-    clearTimeout(t)
-    t = setTimeout(function() {
-      fn.apply(null, args)
-    }, delay)
+export function calc(firstNumber: number, secondNumber: number, operation: MathOperation): number {
+  switch (operation) {
+    case '+':
+      return firstNumber + secondNumber;
+    case '-':
+      return firstNumber - secondNumber;
+    case '*':
+      return firstNumber * secondNumber;
+    case '/':
+      return firstNumber / secondNumber;
+    case '%':
+      return firstNumber % secondNumber;
+    case '**':
+      return firstNumber ** secondNumber;
+    default:
+      return 0;
   }
+}
+
+export function fmt(date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+
+  const padZero = (num: number): string => num < 10 ? `0${num}` : `${num}`;
+
+  return `${year}-${padZero(month)}-${padZero(day)} ${padZero(hours)}:${padZero(minutes)}:${padZero(seconds)}`;
+}
+
+export function validateEmail(email: string): boolean {
+  // Basic email validation checks
+  if (email.length < 5) {
+    return false;
+  }
+
+  if (email.indexOf('@') === -1) {
+    return false;
+  }
+
+  if (email.indexOf('.') === -1) {
+    return false;
+  }
+
+  if (email.indexOf(' ') !== -1) {
+    return false;
+  }
+
+  return true;
+}
+
+export function merge<T extends Record<string, unknown>, U extends Record<string, unknown>>(
+  firstObject: T,
+  secondObject: U
+): T & U {
+  const result = {} as T & U;
+
+  for (const key in firstObject) {
+    result[key] = firstObject[key];
+  }
+
+  for (const key in secondObject) {
+    result[key] = secondObject[key];
+  }
+
+  return result;
+}
+
+type DebouncedFunction<T extends unknown[]> = (...args: T) => void;
+
+export function debounce<T extends unknown[]>(
+  func: (...args: T) => void,
+  delayMs: number
+): DebouncedFunction<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  return function(...args: T): void {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delayMs);
+  };
 }
