@@ -2,229 +2,96 @@ name: Storybook Story Check
 
 on:
   pull_request:
-    branches: [main, master]
+    types: [ready_for_review]
     paths:
-      - 'src/**/*.tsx'
-      - 'src/**/*.ts'
-      - '!src/**/*.stories.ts'
-      - '!src/**/*.stories.tsx'
+      - "packages/backend.ai-ui/src/components/**/*.tsx"
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: write
 
 jobs:
-  check-stories:
+  detect-and-trigger:
+    name: Detect Changes & Trigger Analysis
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: read
-
+    # Skip if PR is still in draft
+    if: github.event.pull_request.draft == false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v44
+      - name: Filter component changes
+        id: filter
+        uses: dorny/paths-filter@v3
         with:
-          files: |
-            src/**/*.tsx
-            src/**/*.ts
-          files_ignore: |
-            src/**/*.stories.ts
-            src/**/*.stories.tsx
-            src/**/*.test.ts
-            src/**/*.test.tsx
-            src/**/*.spec.ts
-            src/**/*.spec.tsx
-            src/**/index.ts
-            src/**/index.tsx
-            src/main.tsx
-            src/App.tsx
-            src/vite-env.d.ts
+          list-files: json
+          filters: |
+            components:
+              - 'packages/backend.ai-ui/src/components/**/*.tsx'
+              - '!packages/backend.ai-ui/src/components/**/*.stories.tsx'
+              - '!packages/backend.ai-ui/src/components/**/*.test.tsx'
 
-      - name: Check for missing stories
-        id: check-stories
-        if: steps.changed-files.outputs.any_changed == 'true'
+      - name: Extract component names
+        id: extract
+        if: steps.filter.outputs.components == 'true'
         run: |
-          echo "Checking for missing story files..."
+          # Extract component names from changed files
+          changed_files='${{ steps.filter.outputs.components_files }}'
 
-          MISSING_STORIES=""
-          CHANGED_COMPONENTS="${{ steps.changed-files.outputs.all_changed_files }}"
+          components=$(echo "$changed_files" | jq -r '.[]' | while read file; do
+            # Skip if not a .tsx file or is a story/test file
+            case "$file" in
+              *.stories.tsx|*.test.tsx) continue ;;
+              *.tsx) ;;
+              *) continue ;;
+            esac
 
-          for file in $CHANGED_COMPONENTS; do
-            # Skip non-component files (utilities, hooks, types, etc.)
-            filename=$(basename "$file")
+            # Extract component name from filename
+            basename "$file" .tsx
+          done | sort -u | tr '\n' ' ')
 
-            # Skip files that start with lowercase (typically utilities/hooks)
-            first_char="${filename:0:1}"
-            if [[ "$first_char" =~ [a-z] ]]; then
-              echo "Skipping non-component file: $file"
-              continue
-            fi
+          echo "components=$components" >> $GITHUB_OUTPUT
+          echo "Changed components: $components"
 
-            # Skip files in specific directories
-            if [[ "$file" == *"/hooks/"* ]] || [[ "$file" == *"/utils/"* ]] || [[ "$file" == *"/types/"* ]] || [[ "$file" == *"/contexts/"* ]] || [[ "$file" == *"/services/"* ]]; then
-              echo "Skipping utility file: $file"
-              continue
-            fi
+      - name: No changes - Skip
+        if: steps.filter.outputs.components != 'true'
+        run: echo "No component changes detected. Skipping analysis."
 
-            # Get the directory and base name without extension
-            dir=$(dirname "$file")
-            base=$(basename "$file" .tsx)
-            base=$(basename "$base" .ts)
-
-            # Check for story file in same directory
-            story_file_ts="$dir/$base.stories.ts"
-            story_file_tsx="$dir/$base.stories.tsx"
-
-            if [[ ! -f "$story_file_ts" ]] && [[ ! -f "$story_file_tsx" ]]; then
-              echo "Missing story for: $file"
-              MISSING_STORIES="$MISSING_STORIES- $file (Expected: $base.stories.ts or $base.stories.tsx)\n"
-            else
-              echo "Story exists for: $file"
-            fi
-          done
-
-          if [[ -n "$MISSING_STORIES" ]]; then
-            echo "missing_stories=true" >> $GITHUB_OUTPUT
-            # Use heredoc for multiline output
-            {
-              echo "missing_list<<EOF"
-              echo -e "$MISSING_STORIES"
-              echo "EOF"
-            } >> $GITHUB_OUTPUT
-          else
-            echo "missing_stories=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Comment on PR
-        if: steps.check-stories.outputs.missing_stories == 'true'
-        uses: actions/github-script@v7
-        env:
-          MISSING_LIST: ${{ steps.check-stories.outputs.missing_list }}
-        with:
-          script: |
-            const missingList = process.env.MISSING_LIST;
-
-            const body = [
-              '## 📚 Storybook Story Check',
-              '',
-              '### ⚠️ Missing Story Files Detected',
-              '',
-              'The following component files were modified but do not have corresponding Story files:',
-              '',
-              missingList,
-              '',
-              '### 🤖 Generate with Claude',
-              '',
-              'Comment below to generate story files:',
-              '',
-              '```',
-              '@claude /create-bui-component-story <component-path>',
-              '```',
-              '',
-              '**Example:**',
-              '```',
-              '@claude /create-bui-component-story src/components/MyButton.tsx',
-              '```',
-              '',
-              '> 💡 You can also generate multiple stories at once:',
-              '> `@claude Please generate stories for all missing components listed above`',
-              '',
-              '### Why This Matters',
-              '- Story files help document component usage and variations',
-              '- They enable visual testing and review',
-              '- They serve as living documentation for the design system',
-              '',
-              '<details>',
-              '<summary>📖 Manual Story File Template (if needed)</summary>',
-              '',
-              '```typescript',
-              'import type { Meta, StoryObj } from \'@storybook/react-vite\';',
-              'import { YourComponent } from \'./YourComponent\';',
-              '',
-              'const meta = {',
-              '  title: \'Example/YourComponent\',',
-              '  component: YourComponent,',
-              '  tags: [\'autodocs\'],',
-              '  parameters: {',
-              '    layout: \'centered\',',
-              '  },',
-              '} satisfies Meta<typeof YourComponent>;',
-              '',
-              'export default meta;',
-              'type Story = StoryObj<typeof meta>;',
-              '',
-              'export const Default: Story = {',
-              '  args: {',
-              '    // your props here',
-              '  },',
-              '};',
-              '```',
-              '</details>',
-              '',
-              '---',
-              '*This check helps maintain component documentation quality.*'
-            ].join('\n');
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Storybook Story Check')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body,
-              });
-            }
-
-      - name: Remove outdated comment
-        if: steps.check-stories.outputs.missing_stories == 'false' || steps.changed-files.outputs.any_changed != 'true'
+      - name: Trigger Copilot Analysis
+        if: steps.filter.outputs.components == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: comments } = await github.rest.issues.listComments({
+            const WORKFLOW_FILE = 'storybook-coverage-checker.lock.yml';
+            const branch = context.payload.pull_request.head.ref;
+
+            const { data: workflows } = await github.rest.actions.listRepoWorkflows({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
             });
 
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('Storybook Story Check')
+            const agenticWorkflow = workflows.workflows.find(
+              w => w.path === `.github/workflows/${WORKFLOW_FILE}`
             );
 
-            if (botComment) {
-              await github.rest.issues.deleteComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-              });
+            if (!agenticWorkflow) {
+              core.warning(`Workflow file ${WORKFLOW_FILE} not found`);
+              return;
             }
 
-      - name: Summary
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: agenticWorkflow.id,
+              ref: branch,
+            });
+
+      - name: Create summary
+        if: steps.filter.outputs.components == 'true'
         run: |
-          echo "## Storybook Check Summary" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ steps.check-stories.outputs.missing_stories }}" == "true" ]]; then
-            echo "⚠️ **Missing Stories Detected**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "${{ steps.check-stories.outputs.missing_list }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **All modified components have Story files**" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "## Storybook Coverage Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered analysis for components:" >> $GITHUB_STEP_SUMMARY
+          echo "\`${{ steps.extract.outputs.components }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Analysis results will be posted as a PR comment by the Storybook Coverage Checker workflow." >> $GITHUB_STEP_SUMMARY
