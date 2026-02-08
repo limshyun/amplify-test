@@ -21,6 +21,8 @@ export interface DataCardProps {
   showActions?: boolean;
   /** Metadata items to display */
   metadata?: { label: string; value: string }[];
+  /** Card visual variant */
+  variant?: 'outlined' | 'filled' | 'elevated';
 }
 
 const statusColors = {
@@ -48,6 +50,7 @@ export const DataCard: React.FC<DataCardProps> = ({
   size = 'medium',
   showActions = true,
   metadata = [],
+  variant = 'outlined',
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -60,6 +63,26 @@ export const DataCard: React.FC<DataCardProps> = ({
   const currentSize = sizeStyles[size];
   const statusColor = statusColors[status];
 
+  const variantStyles = {
+    outlined: {
+      border: isSelected ? '2px solid #007bff' : '1px solid #dee2e6',
+      backgroundColor: isHovered ? '#f8f9fa' : '#ffffff',
+      boxShadow: 'none',
+    },
+    filled: {
+      border: isSelected ? '2px solid #007bff' : '1px solid transparent',
+      backgroundColor: isHovered ? '#e9ecef' : '#f8f9fa',
+      boxShadow: 'none',
+    },
+    elevated: {
+      border: isSelected ? '2px solid #007bff' : '1px solid transparent',
+      backgroundColor: isHovered ? '#f8f9fa' : '#ffffff',
+      boxShadow: isHovered ? '0 8px 24px rgba(0,0,0,0.15)' : '0 4px 12px rgba(0,0,0,0.1)',
+    },
+  };
+
+  const currentVariant = variantStyles[variant];
+
   return (
     <div
       onClick={onClick}
@@ -68,9 +91,9 @@ export const DataCard: React.FC<DataCardProps> = ({
       style={{
         padding: currentSize.padding,
         borderRadius: '12px',
-        border: isSelected ? '2px solid #007bff' : '1px solid #dee2e6',
-        backgroundColor: isHovered ? '#f8f9fa' : '#ffffff',
-        boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)',
+        border: currentVariant.border,
+        backgroundColor: currentVariant.backgroundColor,
+        boxShadow: currentVariant.boxShadow,
         cursor: onClick ? 'pointer' : 'default',
         transition: 'all 0.2s ease',
         maxWidth: '360px',
